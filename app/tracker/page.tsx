@@ -2,10 +2,12 @@
 
 import { useWallet } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import NFTMinter from '../components/NFTMinter';
 import dynamic from 'next/dynamic';
+import { useAuth } from '../../contexts/AuthContext';
+import { saveWorkoutSession } from '../../services/workoutService';
 
 // 동적으로 SquatDetector 컴포넌트 import
 const SquatDetector = dynamic(() => import('../components/SquatDetector'), {
@@ -15,10 +17,18 @@ const SquatDetector = dynamic(() => import('../components/SquatDetector'), {
 
 export default function Tracker() {
   const { publicKey } = useWallet();
+  const { user } = useAuth();
   const [squatCount, setSquatCount] = useState(0);
   const [useCamera, setUseCamera] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const targetSquats = 30;
+  const [startTime, setStartTime] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (squatCount === 1) {
+      setStartTime(Date.now());
+    }
+  }, [squatCount]);
 
   const handleSquat = () => {
     setSquatCount(prev => Math.min(prev + 1, targetSquats));
@@ -30,6 +40,30 @@ export default function Tracker() {
   };
 
   const progress = (squatCount / targetSquats) * 100;
+
+  const handleSave = async () => {
+    if (!user) {
+      setError('운동 기록을 저장하려면 로그인이 필요합니다.');
+      return;
+    }
+
+    if (squatCount === 0) {
+      setError('최소 1회 이상의 스쿼트를 해야 저장할 수 있습니다.');
+      return;
+    }
+
+    try {
+      const duration = startTime ? Math.round((Date.now() - startTime) / 1000) : 0;
+      await saveWorkoutSession(user.uid, squatCount, duration, useCamera ? 'webcam' : 'manual');
+      alert('운동 기록이 저장되었습니다!');
+      setSquatCount(0);
+      setStartTime(null);
+      setError(null);
+    } catch (error) {
+      console.error('운동 기록 저장 실패:', error);
+      setError('운동 기록 저장에 실패했습니다. 다시 시도해주세요.');
+    }
+  };
 
   return (
     <main className="min-h-screen p-4 bg-gray-900 text-white">
@@ -104,6 +138,15 @@ export default function Tracker() {
                 isEnabled={squatCount >= targetSquats}
                 onSuccess={() => setSquatCount(0)}
               />
+            </div>
+
+            <div className="mt-8 text-center">
+              <button
+                onClick={handleSave}
+                className="bg-green-500 hover:bg-green-600 text-white px-8 py-4 rounded-lg text-xl font-bold transition-colors"
+              >
+                운동 저장하기
+              </button>
             </div>
           </div>
         </div>

@@ -40,4 +40,9 @@ next-env.d.ts
 # Solana
 .anchor
 target/
-test-ledger/ 
+test-ledger/
+
+# Firebase
+.firebase/
+.firebaserc
+firebase-debug.log 

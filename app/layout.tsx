@@ -2,6 +2,7 @@ import './globals.css';
 import { Inter } from 'next/font/google';
 import Navbar from './components/Navbar';
 import { Providers } from './components/Providers';
+import { AuthProvider } from '../contexts/AuthContext';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -18,12 +19,14 @@ export default function RootLayout({
   return (
     <html lang="ko">
       <body className={inter.className}>
-        <Providers>
-          <Navbar />
-          <main className="min-h-screen pt-16 bg-black">
-            {children}
-          </main>
-        </Providers>
+        <AuthProvider>
+          <Providers>
+            <Navbar />
+            <main className="min-h-screen pt-16 bg-black">
+              {children}
+            </main>
+          </Providers>
+        </AuthProvider>
       </body>
     </html>
   );

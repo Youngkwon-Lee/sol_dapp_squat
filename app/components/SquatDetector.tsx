@@ -12,7 +12,49 @@ const SquatDetector: React.FC<SquatDetectorProps> = ({ onSquatComplete, onError 
   const [isLoading, setIsLoading] = useState(true);
   const [loadingStatus, setLoadingStatus] = useState<string>('카메라 초기화 중...');
   const [hasWebcam, setHasWebcam] = useState<boolean | null>(null);
+  const [cameras, setCameras] = useState<MediaDeviceInfo[]>([]);
+  const [selectedCamera, setSelectedCamera] = useState<string>('');
   
+  // 사용 가능한 카메라 목록 가져오기
+  const getCameras = async () => {
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoDevices = devices.filter(device => device.kind === 'videoinput');
+      setCameras(videoDevices);
+      if (videoDevices.length > 0) {
+        setSelectedCamera(videoDevices[0].deviceId);
+      }
+    } catch (err) {
+      console.error('카메라 목록 가져오기 실패:', err);
+    }
+  };
+
+  // 카메라 변경 핸들러
+  const handleCameraChange = async (deviceId: string) => {
+    setSelectedCamera(deviceId);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { 
+          deviceId: { exact: deviceId },
+          width: { ideal: 640 },
+          height: { ideal: 480 },
+          frameRate: { ideal: 30 }
+        }
+      });
+      
+      if (videoRef.current) {
+        const oldStream = videoRef.current.srcObject as MediaStream;
+        if (oldStream) {
+          oldStream.getTracks().forEach(track => track.stop());
+        }
+        videoRef.current.srcObject = stream;
+      }
+    } catch (err) {
+      console.error('카메라 변경 중 오류:', err);
+      onError('카메라 변경 중 오류가 발생했습니다.');
+    }
+  };
+
   useEffect(() => {
     let isMounted = true;
     let stream: MediaStream | null = null;
@@ -24,10 +66,13 @@ const SquatDetector: React.FC<SquatDetectorProps> = ({ onSquatComplete, onError 
           throw new Error('웹캠 사용을 위해서는 HTTPS가 필요합니다.');
         }
 
+        // 카메라 목록 가져오기
+        await getCameras();
+
         // TensorFlow.js 먼저 로드
         setLoadingStatus('AI 모델 초기화 중...');
         const tf = await import('@tensorflow/tfjs');
-        await tf.ready(); // WebGL 초기화 대기
+        await tf.ready();
         
         if (!isMounted) return;
 
@@ -48,7 +93,7 @@ const SquatDetector: React.FC<SquatDetectorProps> = ({ onSquatComplete, onError 
         setLoadingStatus('카메라 권한 요청 중...');
         stream = await navigator.mediaDevices.getUserMedia({
           video: { 
-            facingMode: isMobile ? "environment" : "user", // 모바일에서는 후면 카메라 사용
+            deviceId: selectedCamera ? { exact: selectedCamera } : undefined,
             width: { ideal: isMobile ? 1280 : 640 },
             height: { ideal: isMobile ? 720 : 480 },
             frameRate: { ideal: 30 }
@@ -189,6 +234,21 @@ const SquatDetector: React.FC<SquatDetectorProps> = ({ onSquatComplete, onError 
             <div className="mb-2">{loadingStatus}</div>
             <div className="text-sm text-gray-300">잠시만 기다려주세요...</div>
           </div>
+        </div>
+      )}
+      {cameras.length > 1 && (
+        <div className="absolute top-4 right-4 z-10">
+          <select
+            className="bg-gray-800 text-white rounded-lg px-3 py-2 text-sm"
+            value={selectedCamera}
+            onChange={(e) => handleCameraChange(e.target.value)}
+          >
+            {cameras.map((camera) => (
+              <option key={camera.deviceId} value={camera.deviceId}>
+                {camera.label || `카메라 ${cameras.indexOf(camera) + 1}`}
+              </option>
+            ))}
+          </select>
         </div>
       )}
       <video

@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
+import LoginButton from './LoginButton';
 
 const WalletMultiButton = dynamic(
   () => import('@solana/wallet-adapter-react-ui').then(mod => mod.WalletMultiButton),
@@ -24,6 +25,7 @@ const Navbar = () => {
               NFT
             </Link>
             <WalletMultiButton className="!bg-gradient-to-r from-primary to-secondary hover:brightness-110 transition-all" />
+            <LoginButton />
           </div>
         </div>
       </div>
