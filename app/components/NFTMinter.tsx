@@ -1,17 +1,16 @@
 'use client';
 
-import { useConnection, useWallet } from '@solana/wallet-adapter-react';
-import { createUmi } from '@metaplex-foundation/umi-bundle-defaults';
-import { createNft, mplTokenMetadata } from '@metaplex-foundation/mpl-token-metadata';
-import { generateSigner, percentAmount } from '@metaplex-foundation/umi';
-import { walletAdapterIdentity } from '@metaplex-foundation/umi-signer-wallet-adapters';
+import { useWallet } from '@solana/wallet-adapter-react';
+import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
+import { Metaplex, keypairIdentity, bundlrStorage } from '@metaplex-foundation/js';
+import { Connection, clusterApiUrl, Keypair, Transaction, VersionedTransaction } from '@solana/web3.js';
 import { useCallback, useState } from 'react';
 
-// NFT 설정 임포트
+// NFT 설정
 const NFT_CONFIG = {
   name: "Squat Challenge NFT",
   symbol: "SQUAT",
-  uri: "https://arweave.net/yOFBLvRGqHKZqMyqG8l_5wjhpb4H9BVZpG7PDaRUK-E", // 여기에 실제 메타데이터 URI를 넣어주세요
+  uri: "https://arweave.net/yOFBLvRGqHKZqMyqG7l_5wjhpb4H9BVZpG7PDaRUK-E", // 여기에 실제 메타데이터 URI를 넣어주세요
 };
 
 interface NFTMinterProps {
@@ -20,12 +19,11 @@ interface NFTMinterProps {
 }
 
 const NFTMinter = ({ isEnabled, onSuccess }: NFTMinterProps) => {
-  const { connection } = useConnection();
   const wallet = useWallet();
   const [isLoading, setIsLoading] = useState(false);
 
   const mintNFT = useCallback(async () => {
-    if (!wallet.publicKey || !wallet.signTransaction) {
+    if (!wallet.publicKey || !wallet.signTransaction || !wallet.signMessage || !wallet.signAllTransactions) {
       alert('지갑을 연결해주세요!');
       return;
     }
@@ -33,25 +31,28 @@ const NFTMinter = ({ isEnabled, onSuccess }: NFTMinterProps) => {
     setIsLoading(true);
 
     try {
-      // Umi 인스턴스 생성
-      const umi = createUmi(connection.rpcEndpoint)
-        .use(mplTokenMetadata())
-        .use(walletAdapterIdentity(wallet));
+      // Metaplex 인스턴스 생성
+      const connection = new Connection(process.env.NEXT_PUBLIC_RPC_ENDPOINT || clusterApiUrl('devnet'));
+      const metaplex = new Metaplex(connection)
+        .use(bundlrStorage());
 
-      // NFT mint signer 생성
-      const mint = generateSigner(umi);
+      metaplex.identity().setDriver({
+        publicKey: wallet.publicKey,
+        signMessage: wallet.signMessage,
+        signTransaction: wallet.signTransaction,
+        signAllTransactions: wallet.signAllTransactions,
+      });
 
       // NFT 생성
       console.log('NFT 생성 중...');
-      await createNft(umi, {
-        mint,
+      const { nft } = await metaplex.nfts().create({
         name: NFT_CONFIG.name,
         symbol: NFT_CONFIG.symbol,
         uri: NFT_CONFIG.uri,
-        sellerFeeBasisPoints: percentAmount(0),
-      }).sendAndConfirm(umi);
+        sellerFeeBasisPoints: 0,
+      });
 
-      console.log('NFT 발행 완료!');
+      console.log('NFT 발행 완료!', nft);
       alert('NFT가 성공적으로 발행되었습니다! Phantom 지갑에서 확인해보세요.');
       onSuccess?.();
     } catch (error) {
@@ -60,7 +61,7 @@ const NFTMinter = ({ isEnabled, onSuccess }: NFTMinterProps) => {
     } finally {
       setIsLoading(false);
     }
-  }, [connection, wallet, onSuccess]);
+  }, [wallet, onSuccess]);
 
   return (
     <div className="text-center">

@@ -8,12 +8,13 @@ import {
 } from '@metaplex-foundation/umi';
 import { createUmi } from '@metaplex-foundation/umi-bundle-defaults';
 import { irysUploader } from '@metaplex-foundation/umi-uploader-irys';
-import { createNft, mplTokenMetadata } from '@metaplex-foundation/mpl-token-metadata';
+import { createNft, mplTokenMetadata, TokenStandard } from '@metaplex-foundation/mpl-token-metadata';
 import { Keypair } from '@solana/web3.js';
 import * as bs58 from 'bs58';
 import fs from 'fs';
 import path from 'path';
 import dotenv from 'dotenv';
+import { clusterApiUrl } from '@solana/web3.js';
 
 dotenv.config();
 
@@ -21,7 +22,7 @@ const createSquatNft = async () => {
   console.log('NFT 생성을 시작합니다...');
 
   // Umi 설정
-  const umi = createUmi('https://api.devnet.solana.com')
+  const umi = createUmi(clusterApiUrl('devnet'))
     .use(mplTokenMetadata())
     .use(irysUploader());
 

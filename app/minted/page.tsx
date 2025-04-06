@@ -3,9 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
-import { createUmi } from '@metaplex-foundation/umi-bundle-defaults';
-import { publicKey } from '@metaplex-foundation/umi';
-import { fetchDigitalAsset } from '@metaplex-foundation/mpl-token-metadata';
+import { Metaplex } from '@metaplex-foundation/js';
 import { Connection, clusterApiUrl, LAMPORTS_PER_SOL, PublicKey } from '@solana/web3.js';
 
 interface NFT {
@@ -33,39 +31,25 @@ export default function Minted() {
       }
 
       try {
-        const connection = new Connection(clusterApiUrl('devnet'));
-        const umi = createUmi('https://api.devnet.solana.com');
+        const connection = new Connection(process.env.NEXT_PUBLIC_RPC_ENDPOINT || clusterApiUrl('devnet'));
+        const metaplex = new Metaplex(connection);
         
-        // 지갑의 모든 토큰 계정 가져오기
-        const accounts = await connection.getParsedTokenAccountsByOwner(
-          wallet.publicKey,
-          { programId: new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA') }
-        );
-
-        // NFT 필터링 (수량 1, 소수점 0)
-        const nftAccounts = accounts.value.filter(
-          (account) => 
-            account.account.data.parsed.info.tokenAmount.amount === '1' &&
-            account.account.data.parsed.info.tokenAmount.decimals === 0
-        );
+        // 지갑의 모든 NFT 가져오기
+        const myNfts = await metaplex.nfts().findAllByOwner({ owner: wallet.publicKey });
 
         const nftData = await Promise.all(
-          nftAccounts.map(async (account) => {
+          myNfts.map(async (nft) => {
             try {
-              const mintAddress = account.account.data.parsed.info.mint;
-              const asset = await fetchDigitalAsset(umi, publicKey(mintAddress));
-              const metadata = asset.metadata;
+              if (!nft.uri) return null;
               
-              if (!metadata.uri) return null;
-              
-              const response = await fetch(metadata.uri);
+              const response = await fetch(nft.uri);
               const json = await response.json();
               
               return {
-                name: metadata.name,
+                name: nft.name,
                 image: json.image,
                 description: json.description || '',
-                mintAddress,
+                mintAddress: nft.address.toString(),
                 ...(json.attributes ? { attributes: json.attributes } : {})
               } as NFT;
             } catch (error) {

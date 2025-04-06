@@ -13,8 +13,7 @@ async function main() {
       address: "https://devnet.irys.xyz",
       timeout: 60000,
       providerUrl: "https://api.devnet.solana.com",
-      priceMultiplier: 1,
-      uploadPrice: sol(0.01) // 0.01 SOL로 설정
+      priceMultiplier: 1.0
     }));
 
   // Umi 서명자 생성
@@ -23,14 +22,6 @@ async function main() {
   // 서명자 설정
   umi.use(keypairIdentity(signer));
 
-  // Irys 업로더에 SOL 충전
-  console.log("Irys 업로더에 SOL 충전 중...");
-  await umi.uploader.fund(0.1); // 0.1 SOL 충전
-  console.log("Irys 업로더 충전 완료");
-
-  // 임시 키페어 생성 (테스트용)
-  const keypair = Keypair.generate();
-  
   // 이미지 파일 읽기
   const imageBuffer = fs.readFileSync(path.join(process.cwd(), "public", "nft-image.svg"));
   const imageFile = createGenericFile(imageBuffer, "nft-image.svg", {
