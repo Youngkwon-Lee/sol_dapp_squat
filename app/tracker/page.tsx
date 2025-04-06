@@ -32,17 +32,19 @@ export default function Tracker() {
   const progress = (squatCount / targetSquats) * 100;
 
   return (
-    <main className="min-h-screen p-4">
+    <main className="min-h-screen p-4 bg-gray-900 text-white">
       <div className="max-w-4xl mx-auto">
-        <div className="flex justify-between items-center mb-8">
-          <Link href="/" className="text-blue-500 hover:text-blue-600">
+        <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-8">
+          <Link href="/" className="text-blue-500 hover:text-blue-600 order-1 sm:order-none">
             ← 돌아가기
           </Link>
-          <h1 className="text-2xl font-bold">스쿼트 트래커</h1>
-          <WalletMultiButton />
+          <h1 className="text-2xl font-bold order-0 sm:order-none">스쿼트 트래커</h1>
+          <div className="order-2 sm:order-none w-full sm:w-auto">
+            <WalletMultiButton className="!w-full sm:!w-auto" />
+          </div>
         </div>
 
-        <div className="bg-gray-900 rounded-lg shadow-lg p-6 text-white">
+        <div className="bg-gray-800 rounded-lg shadow-lg p-4 sm:p-6">
           <div className="mb-6">
             <div className="flex justify-between mb-2">
               <span className="text-sm font-medium">진행률</span>
@@ -56,49 +58,47 @@ export default function Tracker() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-6">
-            <div className="text-center">
-              <div className="flex justify-center gap-4 mb-4">
-                <button
-                  onClick={() => {
-                    setUseCamera(!useCamera);
-                    setError(null);
-                  }}
-                  className="bg-purple-500 hover:bg-purple-600 text-white font-bold py-2 px-4 rounded"
-                >
-                  {useCamera ? '수동 모드로 전환' : '카메라 모드로 전환'}
-                </button>
-              </div>
-
-              {error && (
-                <div className="text-red-500 mb-4 p-2 bg-red-100 rounded">
-                  {error}
-                </div>
-              )}
-
-              {useCamera ? (
-                <div className="mb-6">
-                  <SquatDetector 
-                    onSquatComplete={handleSquat} 
-                    onError={handleError}
-                  />
-                </div>
-              ) : (
-                <div className="text-center">
-                  <h2 className="text-xl font-bold mb-4">수동 카운터</h2>
-                  <div className="text-4xl font-bold mb-4">{squatCount}</div>
-                  <button
-                    onClick={handleSquat}
-                    className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded"
-                    disabled={squatCount >= targetSquats}
-                  >
-                    스쿼트 완료
-                  </button>
-                </div>
-              )}
+          <div className="space-y-6">
+            <div className="flex justify-center">
+              <button
+                onClick={() => {
+                  setUseCamera(!useCamera);
+                  setError(null);
+                }}
+                className="bg-purple-500 hover:bg-purple-600 text-white font-bold py-3 px-6 rounded-lg w-full sm:w-auto"
+              >
+                {useCamera ? '수동 모드로 전환' : '카메라 모드로 전환'}
+              </button>
             </div>
 
-            <div className="text-center">
+            {error && (
+              <div className="text-red-500 bg-red-100 dark:bg-red-900/30 rounded-lg p-4 text-sm">
+                {error}
+              </div>
+            )}
+
+            {useCamera ? (
+              <div className="aspect-video w-full max-w-2xl mx-auto rounded-lg overflow-hidden">
+                <SquatDetector 
+                  onSquatComplete={handleSquat} 
+                  onError={handleError}
+                />
+              </div>
+            ) : (
+              <div className="text-center p-4 bg-gray-700 rounded-lg">
+                <h2 className="text-xl font-bold mb-4">수동 카운터</h2>
+                <div className="text-5xl font-bold mb-6">{squatCount}</div>
+                <button
+                  onClick={handleSquat}
+                  disabled={squatCount >= targetSquats}
+                  className="bg-blue-500 hover:bg-blue-600 disabled:bg-gray-500 disabled:cursor-not-allowed text-white font-bold py-4 px-8 rounded-lg text-lg w-full sm:w-auto"
+                >
+                  스쿼트 완료
+                </button>
+              </div>
+            )}
+
+            <div className="text-center p-4 bg-gray-700 rounded-lg">
               <h2 className="text-xl font-bold mb-4">NFT 발행</h2>
               <NFTMinter 
                 isEnabled={squatCount >= targetSquats}
