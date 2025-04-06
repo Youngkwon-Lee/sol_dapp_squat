@@ -9,11 +9,18 @@ interface SquatDetectorProps {
 
 const SquatDetector: React.FC<SquatDetectorProps> = ({ onSquatComplete, onError }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadingStatus, setLoadingStatus] = useState<string>('카메라 초기화 중...');
   const [hasWebcam, setHasWebcam] = useState<boolean | null>(null);
   const [cameras, setCameras] = useState<MediaDeviceInfo[]>([]);
   const [selectedCamera, setSelectedCamera] = useState<string>('');
+  const [squatCount, setSquatCount] = useState(0);
+  const [viewMode, setViewMode] = useState<'front' | 'side'>('front');
+  const [kneeAngle, setKneeAngle] = useState<number>(0);
+  const [kneeValgus, setKneeValgus] = useState<number>(0);
+  const [isFullBodyVisible, setIsFullBodyVisible] = useState(false);
+  const [showGuide, setShowGuide] = useState(true);
   
   // 사용 가능한 카메라 목록 가져오기
   const getCameras = async () => {
@@ -53,6 +60,166 @@ const SquatDetector: React.FC<SquatDetectorProps> = ({ onSquatComplete, onError 
       console.error('카메라 변경 중 오류:', err);
       onError('카메라 변경 중 오류가 발생했습니다.');
     }
+  };
+
+  // 키포인트 그리기 함수
+  const drawKeypoints = (keypoints: any[], minConfidence: number) => {
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext('2d');
+    if (!canvas || !ctx) return;
+
+    if (videoRef.current) {
+      canvas.width = videoRef.current.videoWidth;
+      canvas.height = videoRef.current.videoHeight;
+    }
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // 스켈레톤 연결 정의
+    const connections = [
+      ['nose', 'leftEye'], ['leftEye', 'leftEar'],
+      ['nose', 'rightEye'], ['rightEye', 'rightEar'],
+      ['nose', 'leftShoulder'], ['nose', 'rightShoulder'],
+      ['leftShoulder', 'rightShoulder'],
+      ['leftShoulder', 'leftElbow'], ['leftElbow', 'leftWrist'],
+      ['rightShoulder', 'rightElbow'], ['rightElbow', 'rightWrist'],
+      ['leftShoulder', 'leftHip'], ['rightShoulder', 'rightHip'],
+      ['leftHip', 'rightHip'],
+      ['leftHip', 'leftKnee'], ['leftKnee', 'leftAnkle'],
+      ['rightHip', 'rightKnee'], ['rightKnee', 'rightAnkle']
+    ];
+
+    // 선 그리기
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = 'rgba(147, 51, 234, 0.7)'; // 솔라나 보라색
+    
+    connections.forEach(([partA, partB]) => {
+      const pointA = keypoints.find(kp => kp.part === partA);
+      const pointB = keypoints.find(kp => kp.part === partB);
+      
+      if (pointA && pointB && pointA.score > minConfidence && pointB.score > minConfidence) {
+        ctx.beginPath();
+        ctx.moveTo(pointA.position.x, pointA.position.y);
+        ctx.lineTo(pointB.position.x, pointB.position.y);
+        ctx.stroke();
+      }
+    });
+
+    // 키포인트 그리기
+    keypoints.forEach(keypoint => {
+      if (keypoint.score >= minConfidence) {
+        const { y, x } = keypoint.position;
+        
+        // 그라데이션 생성
+        const gradient = ctx.createRadialGradient(x, y, 0, x, y, 8);
+        gradient.addColorStop(0, 'rgba(168, 85, 247, 0.9)'); // 밝은 보라색
+        gradient.addColorStop(1, 'rgba(147, 51, 234, 0.4)'); // 어두운 보라색
+        
+        // 외부 원
+        ctx.beginPath();
+        ctx.arc(x, y, 8, 0, 2 * Math.PI);
+        ctx.fillStyle = gradient;
+        ctx.fill();
+        
+        // 내부 원
+        ctx.beginPath();
+        ctx.arc(x, y, 4, 0, 2 * Math.PI);
+        ctx.fillStyle = 'rgba(168, 85, 247, 1)';
+        ctx.fill();
+      }
+    });
+
+    // 스쿼트 카운트와 각도 표시를 위한 배경 추가
+    const padding = 10;
+    const lineHeight = 30;
+    const textY = 30;
+    
+    ctx.font = 'bold 24px Arial';
+    const countText = `스쿼트: ${squatCount}회`;
+    const countWidth = ctx.measureText(countText).width;
+    
+    // 배경
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+    ctx.roundRect(padding - 5, textY - 24, countWidth + 10, lineHeight, 5);
+    ctx.fill();
+    
+    // 텍스트
+    ctx.fillStyle = '#fff';
+    ctx.fillText(countText, padding, textY);
+
+    // 각도 표시
+    const angleText = viewMode === 'side' 
+      ? `무릎 각도: ${Math.round(kneeAngle)}°`
+      : `무릎 안쪽 각도: ${Math.round(kneeValgus)}°`;
+    const angleWidth = ctx.measureText(angleText).width;
+    
+    // 각도 배경
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+    ctx.roundRect(padding - 5, textY + 5, angleWidth + 10, lineHeight, 5);
+    ctx.fill();
+    
+    // 각도 텍스트
+    ctx.fillStyle = '#fff';
+    ctx.fillText(angleText, padding, textY + 30);
+  };
+
+  // 무릎 각도 계산 함수
+  const calculateKneeAngle = (keypoints: any[]) => {
+    const leftHip = keypoints.find(kp => kp.part === 'leftHip');
+    const leftKnee = keypoints.find(kp => kp.part === 'leftKnee');
+    const leftAnkle = keypoints.find(kp => kp.part === 'leftAnkle');
+
+    if (leftHip && leftKnee && leftAnkle && 
+        leftHip.score > 0.5 && leftKnee.score > 0.5 && leftAnkle.score > 0.5) {
+      const angle = calculateAngle(
+        leftHip.position,
+        leftKnee.position,
+        leftAnkle.position
+      );
+      setKneeAngle(angle);
+      return angle;
+    }
+    return 0;
+  };
+
+  // knee valgus 계산 함수
+  const calculateKneeValgus = (keypoints: any[]) => {
+    const leftHip = keypoints.find(kp => kp.part === 'leftHip');
+    const leftKnee = keypoints.find(kp => kp.part === 'leftKnee');
+    const rightHip = keypoints.find(kp => kp.part === 'rightHip');
+    const rightKnee = keypoints.find(kp => kp.part === 'rightKnee');
+
+    if (leftHip && leftKnee && rightHip && rightKnee &&
+        leftHip.score > 0.5 && leftKnee.score > 0.5 && 
+        rightHip.score > 0.5 && rightKnee.score > 0.5) {
+      // 무릎이 안쪽으로 들어간 정도를 각도로 계산
+      const hipWidth = Math.abs(leftHip.position.x - rightHip.position.x);
+      const kneeWidth = Math.abs(leftKnee.position.x - rightKnee.position.x);
+      const valgusAngle = Math.acos(kneeWidth / hipWidth) * (180 / Math.PI);
+      setKneeValgus(valgusAngle);
+      return valgusAngle;
+    }
+    return 0;
+  };
+
+  // 세 점 사이의 각도 계산 함수
+  const calculateAngle = (point1: {x: number, y: number}, 
+                         point2: {x: number, y: number}, 
+                         point3: {x: number, y: number}) => {
+    const angle1 = Math.atan2(point1.y - point2.y, point1.x - point2.x);
+    const angle2 = Math.atan2(point3.y - point2.y, point3.x - point2.x);
+    let angle = (angle2 - angle1) * (180 / Math.PI);
+    if (angle < 0) angle += 360;
+    return angle;
+  };
+
+  // 전신 감지 확인 함수
+  const checkFullBodyVisibility = (keypoints: any[]) => {
+    const requiredParts = ['nose', 'leftAnkle', 'rightAnkle', 'leftWrist', 'rightWrist'];
+    const visibleParts = keypoints.filter(kp => kp.score > 0.5).map(kp => kp.part);
+    const isVisible = requiredParts.every(part => visibleParts.includes(part));
+    setIsFullBodyVisible(isVisible);
+    return isVisible;
   };
 
   useEffect(() => {
@@ -143,7 +310,6 @@ const SquatDetector: React.FC<SquatDetectorProps> = ({ onSquatComplete, onError 
           }
 
           const now = performance.now();
-          // 모바일에서는 프레임 처리 간격을 더 길게 설정 (100ms)
           if (now - lastProcessedTime < (isMobile ? 100 : 33.33)) {
             if (isMounted) {
               requestAnimationFrame(detectPose);
@@ -154,30 +320,51 @@ const SquatDetector: React.FC<SquatDetectorProps> = ({ onSquatComplete, onError 
 
           try {
             const pose = await net.estimateSinglePose(videoRef.current, {
-              flipHorizontal: !isMobile // 전면 카메라일 때만 좌우 반전
+              flipHorizontal: !isMobile
             });
             
             if (!isMounted) return;
 
-            const leftHip = pose.keypoints.find(kp => kp.part === 'leftHip');
-            const rightHip = pose.keypoints.find(kp => kp.part === 'rightHip');
+            const isFullBody = checkFullBodyVisibility(pose.keypoints);
             
-            if (leftHip && rightHip && leftHip.score > 0.5 && rightHip.score > 0.5) {
-              const avgHipY = (leftHip.position.y + rightHip.position.y) / 2;
-              
-              // 모바일에서는 더 큰 움직임 감지
-              const threshold = isMobile ? 60 : 40;
-              
-              if (!squatStarted && avgHipY > prevHipY + threshold) {
+            // 항상 키포인트와 스켈레톤 그리기
+            drawKeypoints(pose.keypoints, 0.3); // 신뢰도 임계값을 0.3으로 낮춤
+
+            if (viewMode === 'side') {
+              // 측면 모드: 무릎 각도로 스쿼트 감지
+              const angle = calculateKneeAngle(pose.keypoints);
+              if (angle > 160 && !squatStarted) {
                 squatStarted = true;
-              } else if (squatStarted && avgHipY < prevHipY - threshold) {
+              } else if (angle < 90 && squatStarted) {
                 squatStarted = false;
                 if (isMounted) {
+                  setSquatCount(prev => prev + 1);
                   onSquatComplete();
                 }
               }
+            } else {
+              // 정면 모드: 엉덩이 Y축 위치와 knee valgus로 스쿼트 감지
+              const leftHip = pose.keypoints.find(kp => kp.part === 'leftHip');
+              const rightHip = pose.keypoints.find(kp => kp.part === 'rightHip');
+              const valgus = calculateKneeValgus(pose.keypoints);
               
-              prevHipY = avgHipY;
+              if (leftHip && rightHip && leftHip.score > 0.5 && rightHip.score > 0.5) {
+                const avgHipY = (leftHip.position.y + rightHip.position.y) / 2;
+                
+                const threshold = isMobile ? 60 : 40;
+                
+                if (!squatStarted && avgHipY > prevHipY + threshold && valgus < 15) {
+                  squatStarted = true;
+                } else if (squatStarted && avgHipY < prevHipY - threshold && valgus < 15) {
+                  squatStarted = false;
+                  if (isMounted) {
+                    setSquatCount(prev => prev + 1);
+                    onSquatComplete();
+                  }
+                }
+                
+                prevHipY = avgHipY;
+              }
             }
           } catch (err) {
             console.error('포즈 감지 중 오류:', err);
@@ -227,38 +414,100 @@ const SquatDetector: React.FC<SquatDetectorProps> = ({ onSquatComplete, onError 
   }
 
   return (
-    <div className="relative w-full h-full">
-      {isLoading && (
-        <div className="absolute inset-0 flex items-center justify-center bg-gray-900 bg-opacity-75 rounded-lg">
-          <div className="text-white text-center">
-            <div className="mb-2">{loadingStatus}</div>
-            <div className="text-sm text-gray-300">잠시만 기다려주세요...</div>
+    <div className="relative">
+      {showGuide && (
+        <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/80 rounded-lg">
+          <div className="text-center p-6 bg-gray-800/90 rounded-lg max-w-md">
+            <h3 className="text-xl font-bold mb-4 text-purple-400">웹캠 사용 가이드</h3>
+            <ul className="text-left space-y-2 text-gray-200 mb-6">
+              <li>• 카메라와 2-3m 거리를 유지해주세요</li>
+              <li>• 전신이 카메라에 보이도록 해주세요</li>
+              <li>• {viewMode === 'front' ? '정면' : '측면'}을 카메라에 보여주세요</li>
+              <li>• 밝은 곳에서 진행해주세요</li>
+            </ul>
+            <button
+              onClick={() => setShowGuide(false)}
+              className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg transition-colors"
+            >
+              시작하기
+            </button>
           </div>
         </div>
       )}
-      {cameras.length > 1 && (
-        <div className="absolute top-4 right-4 z-10">
-          <select
-            className="bg-gray-800 text-white rounded-lg px-3 py-2 text-sm"
-            value={selectedCamera}
-            onChange={(e) => handleCameraChange(e.target.value)}
-          >
-            {cameras.map((camera) => (
-              <option key={camera.deviceId} value={camera.deviceId}>
-                {camera.label || `카메라 ${cameras.indexOf(camera) + 1}`}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
+      
       <video
         ref={videoRef}
         autoPlay
         playsInline
         muted
-        className="w-full h-full object-cover rounded-lg"
-        style={{ transform: 'scaleX(-1)' }}
+        className="w-full h-auto rounded-lg"
       />
+      <canvas
+        ref={canvasRef}
+        className="absolute top-0 left-0 w-full h-full"
+        style={{ pointerEvents: 'none' }}
+      />
+      
+      {!isFullBodyVisible && !isLoading && !showGuide && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-lg">
+          <div className="text-center p-4 bg-red-900/80 rounded-lg">
+            <p className="text-white">전신이 보이지 않습니다</p>
+            <p className="text-sm text-gray-300">카메라와의 거리를 조절해주세요</p>
+          </div>
+        </div>
+      )}
+
+      {isLoading && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-lg">
+          <div className="text-white text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-2"></div>
+            <p>{loadingStatus}</p>
+          </div>
+        </div>
+      )}
+
+      <div className="absolute top-4 right-4 flex gap-2">
+        <button
+          onClick={() => {
+            setViewMode('front');
+            setShowGuide(true);
+          }}
+          className={`px-3 py-2 rounded-lg ${
+            viewMode === 'front' 
+              ? 'bg-purple-600 text-white' 
+              : 'bg-gray-600 text-gray-300'
+          }`}
+        >
+          정면
+        </button>
+        <button
+          onClick={() => {
+            setViewMode('side');
+            setShowGuide(true);
+          }}
+          className={`px-3 py-2 rounded-lg ${
+            viewMode === 'side' 
+              ? 'bg-purple-600 text-white' 
+              : 'bg-gray-600 text-gray-300'
+          }`}
+        >
+          측면
+        </button>
+      </div>
+
+      {cameras.length > 1 && (
+        <select
+          value={selectedCamera}
+          onChange={(e) => handleCameraChange(e.target.value)}
+          className="absolute bottom-4 right-4 bg-purple-600 text-white px-3 py-2 rounded-lg"
+        >
+          {cameras.map(camera => (
+            <option key={camera.deviceId} value={camera.deviceId}>
+              {camera.label || `카메라 ${camera.deviceId.slice(0, 5)}`}
+            </option>
+          ))}
+        </select>
+      )}
     </div>
   );
 };

@@ -2,8 +2,33 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if false;
+    match /workouts/{workout} {
+      // Google 로그인 사용자의 경우
+      function isGoogleUser() {
+        return request.auth != null && resource.data.userId == request.auth.uid;
+      }
+
+      // 지갑 연결 사용자의 경우
+      function isWalletUser(rsc) {
+        return rsc.data.walletAddress != null;
+      }
+
+      // 읽기 권한
+      allow read: if 
+        (request.auth != null && resource.data.userId == request.auth.uid) ||  // Google 로그인
+        (resource.data.walletAddress != null);                                 // 지갑 주소
+      
+      // 생성 권한
+      allow create: if 
+        (request.auth != null && request.resource.data.userId == request.auth.uid) ||  // Google 로그인
+        (request.resource.data.walletAddress != null &&                               // 지갑 주소
+         request.resource.data.walletAddress != '');                                  // 빈 문자열이 아님
+      
+      // 수정/삭제 권한
+      allow update, delete: if 
+        (request.auth != null && resource.data.userId == request.auth.uid) ||  // Google 로그인
+        (resource.data.walletAddress != null &&                               // 지갑 주소
+         resource.data.walletAddress == request.resource.data.walletAddress); // 동일한 지갑 주소
     }
   }
 }
