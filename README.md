@@ -34,12 +34,11 @@ cd sol_dapp_squat
 npm install
 ```
 
-3. Set up environment variables
+3. Set up environment variables (optional)
 ```bash
 cp .env.example .env
 ```
-Edit `.env` file with your credentials:
-- `PRIVATE_KEY`: Your Solana wallet private key
+Edit `.env` file if you want to use a custom RPC endpoint:
 - `RPC_ENDPOINT`: Solana RPC endpoint (default: devnet)
 
 4. Run the development server
@@ -93,12 +92,11 @@ cd sol_dapp_squat
 npm install
 ```
 
-3. 환경 변수 설정
+3. 환경 변수 설정 (선택사항)
 ```bash
 cp .env.example .env
 ```
-`.env` 파일에 다음 정보를 입력하세요:
-- `PRIVATE_KEY`: 솔라나 지갑 비밀키
+커스텀 RPC 엔드포인트를 사용하려면 `.env` 파일을 수정하세요:
 - `RPC_ENDPOINT`: 솔라나 RPC 엔드포인트 (기본값: devnet)
 
 4. 개발 서버 실행

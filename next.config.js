@@ -1,7 +1,11 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  experimental: {
-    instrumentationHook: false
+  env: {
+    RPC_ENDPOINT: process.env.RPC_ENDPOINT
+  },
+  webpack: (config) => {
+    config.externals.push('pino-pretty', 'lokijs', 'encoding');
+    return config;
   }
 }
 
