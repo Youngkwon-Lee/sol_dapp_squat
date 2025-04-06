@@ -1,0 +1,12 @@
+<svg width="500" height="500" viewBox="0 0 500 500" xmlns="http://www.w3.org/2000/svg">
+  <rect width="500" height="500" fill="#1a1a1a"/>
+  <text x="50%" y="40%" font-family="Arial" font-size="40" fill="white" text-anchor="middle">
+    Squat Challenge
+  </text>
+  <text x="50%" y="50%" font-family="Arial" font-size="60" fill="#4CAF50" text-anchor="middle">
+    30회 달성
+  </text>
+  <text x="50%" y="65%" font-family="Arial" font-size="24" fill="#9E9E9E" text-anchor="middle">
+    축하합니다!
+  </text>
+</svg> 

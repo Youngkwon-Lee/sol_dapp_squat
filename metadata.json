@@ -1,0 +1,32 @@
+{
+  "name": "Squat Challenge NFT",
+  "symbol": "SQUAT",
+  "description": "30회 스쿼트 챌린지를 완료하여 획득한 NFT입니다.",
+  "image": "nft-image.svg",
+  "attributes": [
+    {
+      "trait_type": "Challenge",
+      "value": "Squat"
+    },
+    {
+      "trait_type": "Repetitions",
+      "value": 30
+    },
+    {
+      "trait_type": "Level",
+      "value": "Bronze"
+    },
+    {
+      "trait_type": "Achievement Date",
+      "value": "2024-04-06"
+    }
+  ],
+  "properties": {
+    "files": [
+      {
+        "uri": "nft-image.svg",
+        "type": "image/svg+xml"
+      }
+    ]
+  }
+} 

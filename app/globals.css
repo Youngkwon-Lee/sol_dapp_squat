@@ -1,0 +1,39 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --foreground-rgb: 255, 255, 255;
+  --background-start-rgb: 10, 10, 10;
+  --background-end-rgb: 26, 26, 26;
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background: linear-gradient(
+    to bottom,
+    rgb(var(--background-start-rgb)),
+    rgb(var(--background-end-rgb))
+  );
+  min-height: 100vh;
+}
+
+@layer components {
+  .glass-card {
+    @apply bg-dark-light/50 backdrop-blur-lg border border-white/10 rounded-xl;
+  }
+
+  .gradient-text {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-primary to-secondary;
+  }
+
+  .btn-primary {
+    @apply bg-gradient-to-r from-primary to-secondary text-white font-bold py-3 px-6 rounded-lg 
+           hover:from-primary-dark hover:to-secondary-dark transition-all duration-300;
+  }
+
+  .btn-secondary {
+    @apply border border-primary text-primary font-bold py-3 px-6 rounded-lg 
+           hover:bg-primary/10 transition-all duration-300;
+  }
+} 
