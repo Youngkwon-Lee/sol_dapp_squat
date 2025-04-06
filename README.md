@@ -40,6 +40,7 @@ cp .env.example .env
 ```
 Edit `.env` file if you want to use a custom RPC endpoint:
 - `RPC_ENDPOINT`: Solana RPC endpoint (default: devnet)
+- `PRIVATE_KEY`: (For developers only) Your Solana wallet private key for uploading NFT metadata
 
 4. Run the development server
 ```bash
@@ -47,6 +48,50 @@ npm run dev
 ```
 
 5. Open [http://localhost:3000](http://localhost:3000) in your browser
+
+### NFT Minting Process
+
+#### For Developers
+1. Prepare NFT assets:
+   - Place your NFT image in `public/nft-image.svg`
+   - Update metadata template in `metadata.json`
+
+2. Upload NFT assets to Arweave:
+```bash
+# Make sure PRIVATE_KEY is set in .env
+npm run upload-nft-assets
+```
+This will generate `nft-config.json` with the uploaded URIs.
+
+3. Update the NFT URI in `app/components/NFTMinter.tsx`:
+```typescript
+const NFT_CONFIG = {
+  name: "Squat Challenge NFT",
+  symbol: "SQUAT",
+  uri: "YOUR_METADATA_URI_HERE", // Update this with the URI from nft-config.json
+};
+```
+
+#### For Users
+1. Install Phantom Wallet browser extension
+2. Switch to Solana Devnet in Phantom:
+   - Open Phantom wallet
+   - Click settings (⚙️)
+   - Go to Change Network
+   - Select "Devnet"
+
+3. Get some Devnet SOL:
+   - Visit [Solana Faucet](https://solfaucet.com)
+   - Enter your wallet address
+   - Click "Devnet"
+
+4. Using the DApp:
+   - Connect your Phantom wallet
+   - Start doing squats
+   - Complete 30 squats to unlock NFT minting
+   - Click "NFT 발행하기" button
+   - Approve the transaction in Phantom
+   - View your NFT in the gallery
 
 ### Usage
 1. Connect your Phantom wallet
@@ -98,6 +143,7 @@ cp .env.example .env
 ```
 커스텀 RPC 엔드포인트를 사용하려면 `.env` 파일을 수정하세요:
 - `RPC_ENDPOINT`: 솔라나 RPC 엔드포인트 (기본값: devnet)
+- `PRIVATE_KEY`: (개발자용) NFT 메타데이터 업로드를 위한 솔라나 지갑 비밀키
 
 4. 개발 서버 실행
 ```bash
@@ -105,6 +151,50 @@ npm run dev
 ```
 
 5. 브라우저에서 [http://localhost:3000](http://localhost:3000) 접속
+
+### NFT 민팅 프로세스
+
+#### 개발자용
+1. NFT 에셋 준비:
+   - NFT 이미지를 `public/nft-image.svg`에 저장
+   - `metadata.json`에서 메타데이터 템플릿 업데이트
+
+2. NFT 에셋을 Arweave에 업로드:
+```bash
+# .env 파일에 PRIVATE_KEY가 설정되어 있어야 합니다
+npm run upload-nft-assets
+```
+이 과정에서 `nft-config.json` 파일이 생성되며 업로드된 URI가 저장됩니다.
+
+3. `app/components/NFTMinter.tsx`에서 NFT URI 업데이트:
+```typescript
+const NFT_CONFIG = {
+  name: "Squat Challenge NFT",
+  symbol: "SQUAT",
+  uri: "YOUR_METADATA_URI_HERE", // nft-config.json에서 얻은 URI로 업데이트
+};
+```
+
+#### 사용자용
+1. Phantom Wallet 브라우저 확장 프로그램 설치
+2. Phantom에서 Solana Devnet으로 전환:
+   - Phantom 지갑 열기
+   - 설정(⚙️) 클릭
+   - Change Network 선택
+   - "Devnet" 선택
+
+3. Devnet SOL 받기:
+   - [Solana Faucet](https://solfaucet.com) 방문
+   - 지갑 주소 입력
+   - "Devnet" 클릭
+
+4. DApp 사용하기:
+   - Phantom 지갑 연결
+   - 스쿼트 운동 시작
+   - 30회 스쿼트 완료하여 NFT 민팅 잠금 해제
+   - "NFT 발행하기" 버튼 클릭
+   - Phantom에서 트랜잭션 승인
+   - 갤러리에서 NFT 확인
 
 ### 사용 방법
 1. Phantom 지갑 연결
