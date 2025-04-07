@@ -21,6 +21,10 @@ const SquatDetector: React.FC<SquatDetectorProps> = ({ onSquatComplete, onError 
   const [kneeValgus, setKneeValgus] = useState<number>(0);
   const [isFullBodyVisible, setIsFullBodyVisible] = useState(false);
   const [showGuide, setShowGuide] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isDetecting, setIsDetecting] = useState(false);
+  const [lastSquatTime, setLastSquatTime] = useState<number | null>(null);
+  const [isSquatting, setIsSquatting] = useState(false);
   
   // 사용 가능한 카메라 목록 가져오기
   const getCameras = async () => {
@@ -43,9 +47,11 @@ const SquatDetector: React.FC<SquatDetectorProps> = ({ onSquatComplete, onError 
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { 
           deviceId: { exact: deviceId },
-          width: { ideal: 640 },
-          height: { ideal: 480 },
-          frameRate: { ideal: 30 }
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          frameRate: { ideal: 30 },
+          facingMode: { ideal: 'user' },
+          aspectRatio: { ideal: 16/9 }
         }
       });
       
@@ -89,15 +95,15 @@ const SquatDetector: React.FC<SquatDetectorProps> = ({ onSquatComplete, onError 
       ['rightHip', 'rightKnee'], ['rightKnee', 'rightAnkle']
     ];
 
-    // 선 그리기
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = 'rgba(147, 51, 234, 0.7)'; // 솔라나 보라색
+    // 선 그리기 - 더 두껍고 밝게
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = 'rgba(147, 51, 234, 0.9)'; // 더 밝은 보라색
     
     connections.forEach(([partA, partB]) => {
       const pointA = keypoints.find(kp => kp.part === partA);
       const pointB = keypoints.find(kp => kp.part === partB);
       
-      if (pointA && pointB && pointA.score > minConfidence && pointB.score > minConfidence) {
+      if (pointA && pointB && pointA.score > 0.2 && pointB.score > 0.2) { // 신뢰도 임계값 낮춤
         ctx.beginPath();
         ctx.moveTo(pointA.position.x, pointA.position.y);
         ctx.lineTo(pointB.position.x, pointB.position.y);
@@ -105,25 +111,25 @@ const SquatDetector: React.FC<SquatDetectorProps> = ({ onSquatComplete, onError 
       }
     });
 
-    // 키포인트 그리기
+    // 키포인트 그리기 - 더 크고 밝게
     keypoints.forEach(keypoint => {
-      if (keypoint.score >= minConfidence) {
+      if (keypoint.score >= 0.2) { // 신뢰도 임계값 낮춤
         const { y, x } = keypoint.position;
         
         // 그라데이션 생성
-        const gradient = ctx.createRadialGradient(x, y, 0, x, y, 8);
-        gradient.addColorStop(0, 'rgba(168, 85, 247, 0.9)'); // 밝은 보라색
-        gradient.addColorStop(1, 'rgba(147, 51, 234, 0.4)'); // 어두운 보라색
+        const gradient = ctx.createRadialGradient(x, y, 0, x, y, 10);
+        gradient.addColorStop(0, 'rgba(168, 85, 247, 1)'); // 더 밝은 보라색
+        gradient.addColorStop(1, 'rgba(147, 51, 234, 0.6)'); // 더 밝은 보라색
         
         // 외부 원
         ctx.beginPath();
-        ctx.arc(x, y, 8, 0, 2 * Math.PI);
+        ctx.arc(x, y, 10, 0, 2 * Math.PI);
         ctx.fillStyle = gradient;
         ctx.fill();
         
         // 내부 원
         ctx.beginPath();
-        ctx.arc(x, y, 4, 0, 2 * Math.PI);
+        ctx.arc(x, y, 5, 0, 2 * Math.PI);
         ctx.fillStyle = 'rgba(168, 85, 247, 1)';
         ctx.fill();
       }
@@ -215,11 +221,33 @@ const SquatDetector: React.FC<SquatDetectorProps> = ({ onSquatComplete, onError 
 
   // 전신 감지 확인 함수
   const checkFullBodyVisibility = (keypoints: any[]) => {
-    const requiredParts = ['nose', 'leftAnkle', 'rightAnkle', 'leftWrist', 'rightWrist'];
-    const visibleParts = keypoints.filter(kp => kp.score > 0.5).map(kp => kp.part);
+    const requiredParts = [
+      'nose', 
+      'leftShoulder', 'rightShoulder',
+      'leftHip', 'rightHip',
+      'leftKnee', 'rightKnee'
+    ];
+    
+    const visibleParts = keypoints.filter(kp => kp.score > 0.2).map(kp => kp.part);
     const isVisible = requiredParts.every(part => visibleParts.includes(part));
     setIsFullBodyVisible(isVisible);
     return isVisible;
+  };
+
+  // 에러 처리 함수
+  const handleError = (message: string) => {
+    console.error('스쿼트 감지 오류:', message);
+    setError(message);
+    setIsDetecting(false);
+    onError(message);
+  };
+
+  // 스쿼트 감지 상태 업데이트 함수
+  const updateSquatStatus = (isDetected: boolean) => {
+    setIsDetecting(isDetected);
+    if (isDetected) {
+      setLastSquatTime(Date.now());
+    }
   };
 
   useEffect(() => {
@@ -261,9 +289,11 @@ const SquatDetector: React.FC<SquatDetectorProps> = ({ onSquatComplete, onError 
         stream = await navigator.mediaDevices.getUserMedia({
           video: { 
             deviceId: selectedCamera ? { exact: selectedCamera } : undefined,
-            width: { ideal: isMobile ? 1280 : 640 },
-            height: { ideal: isMobile ? 720 : 480 },
-            frameRate: { ideal: 30 }
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+            frameRate: { ideal: 30 },
+            facingMode: { ideal: 'user' },
+            aspectRatio: { ideal: 16/9 }
           }
         });
         
@@ -289,8 +319,8 @@ const SquatDetector: React.FC<SquatDetectorProps> = ({ onSquatComplete, onError 
         const net = await posenet.load({
           architecture: 'MobileNetV1',
           outputStride: 16,
-          inputResolution: { width: 640, height: 480 },
-          multiplier: isMobile ? 0.5 : 0.75, // 모바일에서는 더 가벼운 모델 사용
+          inputResolution: { width: 1280, height: 720 },
+          multiplier: isMobile ? 0.5 : 0.75,
           quantBytes: 2
         });
 
@@ -303,9 +333,7 @@ const SquatDetector: React.FC<SquatDetectorProps> = ({ onSquatComplete, onError 
 
         const detectPose = async () => {
           if (!videoRef.current || !videoRef.current.videoWidth) {
-            if (isMounted) {
-              requestAnimationFrame(detectPose);
-            }
+            handleError('비디오 스트림이 초기화되지 않았습니다.');
             return;
           }
 
@@ -326,16 +354,26 @@ const SquatDetector: React.FC<SquatDetectorProps> = ({ onSquatComplete, onError 
             if (!isMounted) return;
 
             const isFullBody = checkFullBodyVisibility(pose.keypoints);
+            if (!isFullBody) {
+              handleError('전신이 보이지 않습니다. 카메라와의 거리를 조절해주세요.');
+              return;
+            }
             
-            // 항상 키포인트와 스켈레톤 그리기
-            drawKeypoints(pose.keypoints, 0.3); // 신뢰도 임계값을 0.3으로 낮춤
+            // 키포인트와 스켈레톤 그리기
+            drawKeypoints(pose.keypoints, 0.2);
 
             if (viewMode === 'side') {
-              // 측면 모드: 무릎 각도로 스쿼트 감지
               const angle = calculateKneeAngle(pose.keypoints);
-              if (angle > 160 && !squatStarted) {
+              if (angle === 0) {
+                handleError('무릎 각도를 감지할 수 없습니다. 측면을 정확히 보여주세요.');
+                return;
+              }
+
+              if (angle > 150 && !squatStarted) {
+                updateSquatStatus(true);
                 squatStarted = true;
-              } else if (angle < 90 && squatStarted) {
+              } else if (angle < 100 && squatStarted) {
+                updateSquatStatus(false);
                 squatStarted = false;
                 if (isMounted) {
                   setSquatCount(prev => prev + 1);
@@ -343,31 +381,40 @@ const SquatDetector: React.FC<SquatDetectorProps> = ({ onSquatComplete, onError 
                 }
               }
             } else {
-              // 정면 모드: 엉덩이 Y축 위치와 knee valgus로 스쿼트 감지
               const leftHip = pose.keypoints.find(kp => kp.part === 'leftHip');
               const rightHip = pose.keypoints.find(kp => kp.part === 'rightHip');
               const valgus = calculateKneeValgus(pose.keypoints);
               
-              if (leftHip && rightHip && leftHip.score > 0.5 && rightHip.score > 0.5) {
-                const avgHipY = (leftHip.position.y + rightHip.position.y) / 2;
-                
-                const threshold = isMobile ? 60 : 40;
-                
-                if (!squatStarted && avgHipY > prevHipY + threshold && valgus < 15) {
-                  squatStarted = true;
-                } else if (squatStarted && avgHipY < prevHipY - threshold && valgus < 15) {
-                  squatStarted = false;
-                  if (isMounted) {
-                    setSquatCount(prev => prev + 1);
-                    onSquatComplete();
-                  }
-                }
-                
-                prevHipY = avgHipY;
+              if (!leftHip || !rightHip || leftHip.score <= 0.2 || rightHip.score <= 0.2) {
+                handleError('엉덩이 위치를 감지할 수 없습니다. 정면을 정확히 보여주세요.');
+                return;
               }
+
+              const avgHipY = (leftHip.position.y + rightHip.position.y) / 2;
+              const threshold = isMobile ? 50 : 30;
+              
+              if (!squatStarted && avgHipY > prevHipY + threshold && valgus < 20) {
+                updateSquatStatus(true);
+                squatStarted = true;
+              } else if (squatStarted && avgHipY < prevHipY - threshold && valgus < 20) {
+                updateSquatStatus(false);
+                squatStarted = false;
+                if (isMounted) {
+                  setSquatCount(prev => prev + 1);
+                  onSquatComplete();
+                }
+              }
+              
+              prevHipY = avgHipY;
             }
+
+            // 에러 상태 초기화
+            if (error) {
+              setError(null);
+            }
+
           } catch (err) {
-            console.error('포즈 감지 중 오류:', err);
+            handleError('포즈 감지 중 오류가 발생했습니다. 다시 시도해주세요.');
           }
           
           if (isMounted) {
@@ -420,8 +467,8 @@ const SquatDetector: React.FC<SquatDetectorProps> = ({ onSquatComplete, onError 
           <div className="text-center p-6 bg-gray-800/90 rounded-lg max-w-md">
             <h3 className="text-xl font-bold mb-4 text-purple-400">웹캠 사용 가이드</h3>
             <ul className="text-left space-y-2 text-gray-200 mb-6">
-              <li>• 카메라와 2-3m 거리를 유지해주세요</li>
-              <li>• 전신이 카메라에 보이도록 해주세요</li>
+              <li>• 카메라와 1-2m 거리를 유지해주세요</li>
+              <li>• 상반신과 하반신이 모두 보이도록 해주세요</li>
               <li>• {viewMode === 'front' ? '정면' : '측면'}을 카메라에 보여주세요</li>
               <li>• 밝은 곳에서 진행해주세요</li>
             </ul>
@@ -448,6 +495,32 @@ const SquatDetector: React.FC<SquatDetectorProps> = ({ onSquatComplete, onError 
         style={{ pointerEvents: 'none' }}
       />
       
+      {/* 에러 메시지 표시 */}
+      {error && (
+        <div className="absolute top-4 left-4 z-30 bg-red-600/90 text-white p-4 rounded-lg max-w-md">
+          <p className="font-bold mb-2">⚠️ 오류 발생</p>
+          <p>{error}</p>
+        </div>
+      )}
+
+      {/* 스쿼트 감지 상태 표시 */}
+      {!error && isDetecting && (
+        <div className="absolute top-4 left-4 z-30 bg-green-600/90 text-white p-4 rounded-lg">
+          <p className="font-bold">스쿼트 감지 중...</p>
+          <p className="text-sm">올바른 자세를 유지해주세요</p>
+        </div>
+      )}
+
+      {/* 마지막 스쿼트 시간 표시 */}
+      {lastSquatTime && !isDetecting && !error && (
+        <div className="absolute top-4 left-4 z-30 bg-blue-600/90 text-white p-4 rounded-lg">
+          <p className="font-bold">스쿼트 완료!</p>
+          <p className="text-sm">
+            {Math.floor((Date.now() - lastSquatTime) / 1000)}초 전
+          </p>
+        </div>
+      )}
+
       {!isFullBodyVisible && !isLoading && !showGuide && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-lg">
           <div className="text-center p-4 bg-red-900/80 rounded-lg">

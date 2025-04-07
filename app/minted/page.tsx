@@ -13,7 +13,7 @@ interface NFT {
   mintAddress: string;
   attributes?: Array<{
     trait_type: string;
-    value: string;
+    value: string | number;
   }>;
   properties?: {
     stats?: Record<string, number>;
@@ -111,7 +111,10 @@ export default function Minted() {
 
               // 메타데이터가 없는 경우 기본값 설정
               if (!nftData.description) {
-                nftData.description = `${nftData.attributes?.find(attr => attr.trait_type === 'Repetitions')?.value || 0}회 스쿼트 챌린지를 완료하여 획득한 NFT입니다.`;
+                const repetitions = nftData.attributes?.find((attr: { trait_type: string; value: number; }) => 
+                  attr.trait_type === 'Repetitions'
+                )?.value;
+                nftData.description = `${repetitions || 0}회 스쿼트 챌린지를 완료하여 획득한 NFT입니다.`;
               }
 
               console.log('최종 NFT 데이터:', nftData);
@@ -204,178 +207,38 @@ export default function Minted() {
         </div>
       </main>
 
-      {/* NFT 세부정보 모달 */}
       {selectedNft && (
-        <div 
-          className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50"
-          onClick={() => setSelectedNft(null)}
-        >
-          <div 
-            className="bg-gray-900 rounded-lg max-w-4xl w-full p-6 relative"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button 
-              className="absolute top-4 right-4 text-gray-400 hover:text-white text-xl"
-              onClick={() => setSelectedNft(null)}
-            >
-              ✕
-            </button>
-            
-            <div className="flex flex-col md:flex-row gap-8">
-              {/* 이미지 섹션 */}
-              <div className="md:w-1/2">
-                <div className="relative rounded-lg overflow-hidden bg-black/20">
-                  <img 
-                    src={selectedNft.image} 
-                    alt={selectedNft.name}
-                    className="w-full h-auto rounded-lg" 
-                    onError={(e) => {
-                      const target = e.target as HTMLImageElement;
-                      target.onerror = null;
-                      target.src = 'https://placehold.co/600x400?text=Error+Loading+Image';
-                    }}
-                  />
-                </div>
-              </div>
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
+          <div className="bg-gray-800 rounded-lg max-w-2xl w-full p-6">
+            <div className="relative">
+              <img 
+                src={selectedNft.image} 
+                alt={selectedNft.name}
+                className="w-full h-64 object-cover rounded-lg mb-4"
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement;
+                  target.onerror = null;
+                  target.src = 'https://placehold.co/600x400?text=Error+Loading+Image';
+                }}
+              />
+              <h2 className="text-2xl font-bold mb-2">{selectedNft.name}</h2>
+              <p className="text-gray-400 mb-4">{selectedNft.description}</p>
               
-              {/* 정보 섹션 */}
-              <div className="md:w-1/2 space-y-6">
-                {/* 기본 정보 */}
-                <div>
-                  <h2 className="text-3xl font-bold mb-2 gradient-text">{selectedNft.name}</h2>
-                  <p className="text-gray-400">{selectedNft.description || '설명이 없습니다.'}</p>
-                </div>
-
-                {/* NFT 정보 */}
-                <div className="bg-black/20 rounded-lg p-4">
-                  <h3 className="text-lg font-semibold mb-3">NFT 정보</h3>
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-400">소유자</span>
-                      <span className="font-medium">{wallet.publicKey?.toString().slice(0, 4)}...{wallet.publicKey?.toString().slice(-4)}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-400">네트워크</span>
-                      <span className="font-medium">Devnet</span>
-                    </div>
-                  </div>
-                </div>
-                
-                {/* 운동 기록 */}
-                <div className="bg-black/20 rounded-lg p-4">
-                  <h3 className="text-lg font-semibold mb-3">운동 기록</h3>
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead>
-                        <tr className="text-left text-sm text-gray-400">
-                          <th className="pb-2">날짜</th>
-                          <th className="pb-2">스쿼트 횟수</th>
-                          <th className="pb-2">운동 시간</th>
-                          <th className="pb-2">측정 방식</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {selectedNft.attributes && selectedNft.attributes.map((attr, idx) => {
-                          if (attr.trait_type === 'Achievement Date' || attr.trait_type === 'Korean Time') {
-                            let formattedDate;
-                            if (attr.trait_type === 'Korean Time') {
-                              formattedDate = attr.value;
-                            } else {
-                              const date = new Date(attr.value);
-                              formattedDate = new Intl.DateTimeFormat('ko-KR', {
-                                year: 'numeric',
-                                month: '2-digit',
-                                day: '2-digit',
-                                hour: '2-digit',
-                                minute: '2-digit',
-                                hour12: false,
-                                timeZone: 'Asia/Seoul'
-                              }).format(date);
-                            }
-
-                            const repetitions = selectedNft.attributes?.find(a => 
-                              a.trait_type.toLowerCase().includes('repetitions')
-                            )?.value || '0';
-
-                            const exerciseDuration = selectedNft.attributes?.find(a => 
-                              a.trait_type.toLowerCase().includes('exercise duration')
-                            )?.value || '0';
-
-                            return (
-                              <tr key={idx} className="border-t border-gray-700">
-                                <td className="py-2 text-white">{formattedDate}</td>
-                                <td className="py-2 text-white">{repetitions}회</td>
-                                <td className="py-2 text-white">{exerciseDuration}초</td>
-                                <td className="py-2 text-white">자세 인식</td>
-                              </tr>
-                            );
-                          }
-                          return null;
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-
-                {/* 특성 */}
-                {selectedNft.attributes && selectedNft.attributes.length > 0 && (
-                  <div className="bg-black/20 rounded-lg p-4">
-                    <h3 className="text-lg font-semibold mb-3">특성</h3>
-                    <div className="grid grid-cols-2 gap-3">
-                      {selectedNft.attributes.map((attr, idx) => {
-                        const isImportant = ['횟수', '등급', 'count', 'level', 'grade', 'repetitions', 'achievement level'].includes(attr.trait_type.toLowerCase());
-                        return (
-                          <div 
-                            key={idx} 
-                            className={`p-3 rounded-lg transition-colors ${
-                              isImportant 
-                                ? 'bg-blue-900/30 hover:bg-blue-900/40 border border-blue-500/30' 
-                                : 'bg-black/30 hover:bg-black/40'
-                            }`}
-                          >
-                            <div className="text-sm text-gray-400">{attr.trait_type}</div>
-                            <div className={`font-medium ${isImportant ? 'text-blue-400' : 'text-white'}`}>
-                              {attr.value}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {/* 민트 주소 */}
-                <div className="bg-black/20 rounded-lg p-4">
-                  <h3 className="text-lg font-semibold mb-2">민트 주소</h3>
-                  <div className="break-all">
-                    <a 
-                      href={`https://explorer.solana.com/address/${selectedNft.mintAddress}?cluster=devnet`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-400 hover:text-blue-300 text-sm"
-                    >
-                      {selectedNft.mintAddress}
-                    </a>
-                  </div>
-                </div>
-
-                {/* 버튼 */}
-                <div className="flex gap-4 pt-4">
-                  <a 
-                    href={`https://explorer.solana.com/address/${selectedNft.mintAddress}?cluster=devnet`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="btn-primary flex-1 text-center py-3"
-                  >
-                    Explorer에서 보기
-                  </a>
-                  <button 
-                    onClick={() => setSelectedNft(null)}
-                    className="btn-secondary flex-1 py-3"
-                  >
-                    닫기
-                  </button>
-                </div>
+              <div className="flex gap-4 pt-4">
+                <a 
+                  href={`https://explorer.solana.com/address/${selectedNft.mintAddress}?cluster=devnet`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn-primary flex-1 text-center py-3"
+                >
+                  Explorer에서 보기
+                </a>
+                <button 
+                  onClick={() => setSelectedNft(null)}
+                  className="btn-secondary flex-1 py-3"
+                >
+                  닫기
+                </button>
               </div>
             </div>
           </div>
@@ -383,4 +246,4 @@ export default function Minted() {
       )}
     </div>
   );
-} 
+}

@@ -14,6 +14,7 @@ interface WorkoutSession {
   usedWebcam: boolean;
   userId?: string;
   walletAddress?: string;
+  measurementMethod?: string;
 }
 
 export default function Analytics() {
@@ -67,7 +68,8 @@ export default function Analytics() {
             timestamp: data.timestamp,
             usedWebcam: Boolean(data.usedWebcam),
             userId: data.userId,
-            walletAddress: data.walletAddress
+            walletAddress: data.walletAddress,
+            measurementMethod: data.measurementMethod
           };
         }) as WorkoutSession[];
 
@@ -257,10 +259,17 @@ export default function Analytics() {
                         {workout.squatCount}회
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
-                        {Math.round(workout.duration)}초
+                        {Math.round(workout.duration / 60)}분
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
-                        {workout.usedWebcam ? '자세 인식' : '수동'}
+                        <div className="flex items-center gap-4">
+                          <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                            {workout.usedWebcam ? '자세 인식' : '수동'}
+                          </span>
+                          <span className="text-sm text-gray-500">
+                            {workout.squatCount}회 / {Math.round(workout.duration / 60)}분
+                          </span>
+                        </div>
                       </td>
                     </tr>
                   ))}
